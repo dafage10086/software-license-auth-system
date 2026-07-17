@@ -1,0 +1,182 @@
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-default-security: &default-security
+  - no-new-privileges:true
+
+services:
+  postgres:
+    image: postgres:17.5-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - keygen_postgres:/var/lib/postgresql/data
+    networks:
+      - keygen_internal
+    mem_limit: 768m
+    security_opt: *default-security
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - keygen_redis:/data
+    networks:
+      - keygen_internal
+    mem_limit: 256m
+    security_opt: *default-security
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.12-alpine
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB}
+    volumes:
+      - keygen_clickhouse:/var/lib/clickhouse
+    networks:
+      - keygen_internal
+    mem_limit: 1536m
+    security_opt: *default-security
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --user \"$$CLICKHOUSE_USER\" --password \"$$CLICKHOUSE_PASSWORD\" --query 'SELECT 1' >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+
+  setup:
+    profiles: ["setup"]
+    image: keygen/api:v1.7.0
+    env_file:
+      - ${KEYGEN_ENV_FILE:-.env}
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DISABLE_DATABASE_ENVIRONMENT_CHECK: "1"
+    command: >-
+      sh -c "until pg_isready -h postgres -U ${POSTGRES_USER}; do sleep 1; done;
+      bundle exec rails keygen:setup"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    volumes:
+      - keygen_config:/etc/keygen
+    networks:
+      - keygen_internal
+    security_opt: *default-security
+    logging: *default-logging
+    tty: true
+    stdin_open: true
+
+  migrate:
+    profiles: ["migrate"]
+    image: keygen/api:v1.7.0
+    env_file:
+      - ${KEYGEN_ENV_FILE:-.env}
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    command: bundle exec rails db:migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    volumes:
+      - keygen_config:/etc/keygen
+    networks:
+      - keygen_internal
+    security_opt: *default-security
+    logging: *default-logging
+
+  web:
+    image: keygen/api:v1.7.0
+    restart: unless-stopped
+    command: web
+    env_file:
+      - ${KEYGEN_ENV_FILE:-.env}
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    ports:
+      - "127.0.0.1:18788:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    volumes:
+      - keygen_config:/etc/keygen
+    networks:
+      - keygen_internal
+      - keygen_loopback
+    mem_limit: 1024m
+    security_opt: *default-security
+    logging: *default-logging
+    healthcheck:
+      test:
+        - CMD
+        - ruby
+        - -rnet/http
+        - -e
+        - "response = Net::HTTP.get_response(URI('http://127.0.0.1:3000/v1/health')); exit(response.is_a?(Net::HTTPSuccess) ? 0 : 1)"
+      interval: 15s
+      timeout: 5s
+      retries: 20
+
+  worker:
+    image: keygen/api:v1.7.0
+    restart: unless-stopped
+    command: worker
+    env_file:
+      - ${KEYGEN_ENV_FILE:-.env}
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    volumes:
+      - keygen_config:/etc/keygen
+    networks:
+      - keygen_internal
+    mem_limit: 768m
+    security_opt: *default-security
+    logging: *default-logging
+
+networks:
+  keygen_internal:
+    internal: true
+  keygen_loopback:
+    driver: bridge
+
+volumes:
+  keygen_config:
+  keygen_postgres:
+  keygen_redis:
+  keygen_clickhouse:

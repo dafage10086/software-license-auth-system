@@ -1,0 +1,53 @@
+name: Bug report
+description: Report a reproducible defect using fake or redacted data.
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: Do not include credentials, private keys, customer data, or live deployment identifiers.
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - Gateway
+        - Administrator tool
+        - Client SDK
+        - Windows demo
+        - Keygen deployment template
+        - Documentation or CI
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Commit
+      placeholder: Full or short commit SHA
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: List the smallest deterministic steps and use only fake values.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Relevant test output
+      description: Redact paths and identifiers before submitting.

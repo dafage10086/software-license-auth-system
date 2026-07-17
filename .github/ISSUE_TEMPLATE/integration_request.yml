@@ -1,0 +1,44 @@
+name: Integration request
+description: Propose a generic software-licensing integration improvement.
+title: "[Integration] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: Keep proposals generic and compatible with all third-party license boundaries.
+  - type: textarea
+    id: scenario
+    attributes:
+      label: Integration scenario
+      description: Describe the application workflow and target user without production details.
+    validations:
+      required: true
+  - type: textarea
+    id: current-gap
+    attributes:
+      label: Current gap
+      description: Explain why the existing fixed Gateway and SDK surface is insufficient.
+    validations:
+      required: true
+  - type: textarea
+    id: proposed-contract
+    attributes:
+      label: Proposed contract
+      description: List the smallest API, SDK, or deployment change required.
+    validations:
+      required: true
+  - type: textarea
+    id: security
+    attributes:
+      label: Security and license impact
+      description: Explain trust-boundary, secret-handling, and third-party licensing effects.
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirmation
+    attributes:
+      label: Confirmation
+      options:
+        - label: This request contains no real credentials, customer data, or production identifiers.
+          required: true

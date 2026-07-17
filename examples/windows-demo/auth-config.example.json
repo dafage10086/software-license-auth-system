@@ -1,0 +1,6 @@
+{
+  "gateway_base_url": "https://license.example.com",
+  "keygen_public_key": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+  "keygen_account_id": "DEMO_ACCOUNT",
+  "keygen_product_id": "DEMO_PRODUCT"
+}

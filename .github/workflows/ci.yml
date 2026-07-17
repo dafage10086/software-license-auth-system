@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gateway:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: gateway
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.x'
+          cache-dependency-path: gateway/go.mod
+      - run: go test ./... -count=1
+      - run: go vet ./...
+
+  dotnet:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - run: dotnet test .\admin\tests\SoftwareLicenseAuth.Admin.Tests.csproj -c Release --nologo
+      - run: dotnet test .\client-sdk\tests\SoftwareLicenseAuth.Client.Tests.csproj -c Release --nologo
+      - run: dotnet build .\examples\windows-demo\SoftwareLicenseAuth.Demo.csproj -c Release --nologo
+
+  public-release:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy\keygen\test-compose.ps1
+      - run: powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-docs.ps1
+      - run: powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test-public-release.ps1
+      - run: powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify-public-release.ps1
